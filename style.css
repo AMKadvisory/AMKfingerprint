@@ -181,6 +181,27 @@ th { background: var(--gray); }
     min-width: 0; 
 }
 
+/* Database Status & Console */
+.db-status {
+    font-size: 12px;
+    font-weight: bold;
+    margin-right: 15px;
+    color: #666;
+}
+.db-status.success { color: var(--success); }
+.db-status.error { color: var(--danger); }
+
+.console-box {
+    display: none;
+    background: #202124 !important;
+    color: #81c995 !important;
+    font-family: 'Consolas', monospace;
+    font-size: 12px;
+    max-height: 150px;
+    overflow-y: auto;
+    padding: 15px !important;
+}
+
 @media(max-width: 768px) {
     .flex-container { flex-direction: column; }
     .dashboard-grid { grid-template-columns: 1fr; }
