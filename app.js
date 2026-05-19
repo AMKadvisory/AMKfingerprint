@@ -145,6 +145,149 @@ function processAttendance() {
     }, { enableHighAccuracy: true });
 }
 
+// New function for biometric registration
+async function processRegistration() {
+    if (!navigator.geolocation) {
+        showStatus("Geolocation engine unavailable on this browser.", false);
+        return;
+    }
+
+    showStatus("Locating operational coordinates...", true);
+
+    navigator.geolocation.getCurrentPosition(async (position) => {
+        const distance = getDistance(position.coords.latitude, position.coords.longitude, OFFICE_LAT, OFFICE_LON);
+        if (distance > ALLOWED_RADIUS_KM) {
+            showStatus(`Access Denied! You are located outside office limits. (${(distance*1000).toFixed(0)} meters away)`, false);
+            return;
+        }
+
+        const promptId = prompt("Enter your Employee ID to proceed with registration:");
+        if(!promptId) return;
+
+        const { data: employee, error: empError } = await _supabase
+            .from('employees')
+            .select('*')
+            .eq('id', promptId.trim())
+            .maybeSingle();
+
+        if (empError || !employee) {
+            alert("Employee ID not found in centralized cloud registry database.");
+            showStatus("Identity lookup mismatch.", false);
+            return;
+        }
+
+        if (employee.raw_id) {
+            showStatus(`${employee.name} already has biometrics registered.`, false);
+            return;
+        }
+
+        showStatus(`Please touch your fingerprint sensor to register biometrics for ${employee.name}...`, true);
+        const registeredSuccess = await runBiometricRegister(employee);
+        if (registeredSuccess) {
+            showStatus(`✅ Biometrics registered successfully for ${employee.name}!`, true);
+            await updateAdminDashboard();
+        } else {
+            showStatus("Biometric registration rejected or canceled.", false);
+        }
+    }, () => {
+        showStatus("Failed to access location parameter metrics. Check browser permissions.", false);
+    }, { enableHighAccuracy: true });
+}
+
+// Renamed and modified from original recordLog
+async function processAttendanceEvent(employee, action) {
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const startOfDay = `${todayStr}T00:00:00Z`;
+    const endOfDay = `${todayStr}T23:59:59Z`;
+
+    let statusMessage = '';
+    let isSuccess = false;
+    let dbError = null;
+
+    // Logic for check-in
+    if (action === 'check-in') {
+        // Check if already checked in today
+        const { data: existingCheckIn, error: checkInQueryError } = await _supabase
+            .from('check_ins')
+            .select('id')
+            .eq('employee_id', employee.id)
+            .gte('timestamp', startOfDay)
+            .lte('timestamp', endOfDay)
+            .maybeSingle();
+
+        if (checkInQueryError && checkInQueryError.code !== 'PGRST116') { // PGRST116 means "no rows found"
+            console.error('Supabase query error (check-in check):', checkInQueryError);
+            statusMessage = 'Error checking previous check-in status.';
+        } else if (existingCheckIn) {
+            statusMessage = `${employee.name} is already checked IN today.`;
+        } else {
+            const { error } = await _supabase
+                .from('check_ins')
+                .insert([{ employee_id: employee.id, timestamp: now.toISOString() }]);
+            if (!error) {
+                statusMessage = `✅ Check-In Verified: ${employee.name} at ${now.toLocaleTimeString()}`;
+                isSuccess = true;
+            } else {
+                dbError = error;
+                statusMessage = `Error saving Check-In record: ${error.message}`;
+                console.error('Supabase insert error (check-in):', error);
+            }
+        }
+    }
+    // Logic for check-out
+    else if (action === 'check-out') {
+        // Check if checked in today
+        const { data: existingCheckIn, error: checkInQueryError } = await _supabase
+            .from('check_ins')
+            .select('id')
+            .eq('employee_id', employee.id)
+            .gte('timestamp', startOfDay)
+            .lte('timestamp', endOfDay)
+            .maybeSingle();
+
+        if (checkInQueryError && checkInQueryError.code !== 'PGRST116') {
+            console.error('Supabase query error (check-in check for checkout):', checkInQueryError);
+            statusMessage = 'Error checking previous check-in status for check-out.';
+        } else if (!existingCheckIn) {
+            statusMessage = `${employee.name} has not checked IN today.`;
+        } else {
+            // Check if already checked out today
+            const { data: existingCheckOut, error: checkOutQueryError } = await _supabase
+                .from('check_outs')
+                .select('id')
+                .eq('employee_id', employee.id)
+                .gte('timestamp', startOfDay)
+                .lte('timestamp', endOfDay)
+                .maybeSingle();
+
+            if (checkOutQueryError && checkOutQueryError.code !== 'PGRST116') {
+                console.error('Supabase query error (check-out check):', checkOutQueryError);
+                statusMessage = 'Error checking previous check-out status.';
+            } else if (existingCheckOut) {
+                statusMessage = `${employee.name} is already checked OUT today.`;
+            } else {
+                const { error } = await _supabase
+                    .from('check_outs')
+                    .insert([{ employee_id: employee.id, timestamp: now.toISOString() }]);
+                if (!error) {
+                    statusMessage = `✅ Check-Out Verified: ${employee.name} at ${now.toLocaleTimeString()}`;
+                    isSuccess = true;
+                } else {
+                    dbError = error;
+                    statusMessage = `Error saving Check-Out record: ${error.message}`;
+                    console.error('Supabase insert error (check-out):', error);
+                }
+            }
+        }
+    } else {
+        statusMessage = 'Invalid attendance action.';
+    }
+
+    showStatus(statusMessage, isSuccess);
+    await updateAdminDashboard();
+}
+
 // SELF-REGISTRATION PIPELINE (FIRST LOGIN)
 async function runBiometricRegister(employee) {
     if (!window.PublicKeyCredential) {
@@ -210,60 +353,6 @@ async function runBiometricVerification(employee) {
     return false;
 }
 
-async function recordLog(employee) {
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-    const startOfDay = `${todayStr}T00:00:00Z`;
-    const endOfDay = `${todayStr}T23:59:59Z`;
-    
-    // 1. Check if employee has checked in today
-    const { data: checkInData } = await _supabase
-        .from('check_ins')
-        .select('id')
-        .eq('employee_id', employee.id)
-        .gte('timestamp', startOfDay)
-        .lte('timestamp', endOfDay)
-        .maybeSingle();
-
-    if (!checkInData) {
-        // No check-in found, perform Check-In
-        const { error } = await _supabase
-            .from('check_ins')
-            .insert([{ employee_id: employee.id, timestamp: now.toISOString() }]);
-        
-        if (!error) {
-            showStatus(`✅ Check-In Verified: ${employee.name} at ${now.toLocaleTimeString()}`, true);
-        } else {
-            showStatus("Error saving Check-In record.", false);
-        }
-    } else {
-        // 2. Already checked in, check if already checked out today
-        const { data: checkOutData } = await _supabase
-            .from('check_outs')
-            .select('id')
-            .eq('employee_id', employee.id)
-            .gte('timestamp', startOfDay)
-            .lte('timestamp', endOfDay)
-            .maybeSingle();
-
-        if (!checkOutData) {
-            // Perform Check-Out
-            const { error } = await _supabase
-                .from('check_outs')
-                .insert([{ employee_id: employee.id, timestamp: now.toISOString() }]);
-            
-            if (!error) {
-                showStatus(`✅ Check-Out Verified: ${employee.name} at ${now.toLocaleTimeString()}`, true);
-            } else {
-                showStatus("Error saving Check-Out record.", false);
-            }
-        } else {
-            showStatus(`${employee.name} has already completed Check-In and Check-Out for today.`, false);
-        }
-    }
-    await updateAdminDashboard();
-}
-
 // ==========================================
 // ADMIN DASHBOARD CORE METRIC CALCULATIONS
 // ==========================================
@@ -276,12 +365,15 @@ async function updateAdminDashboard() {
     const endOfDay = `${todayStr}T23:59:59Z`;
 
     // 2. Fetch all registered employees
-    const { data: allEmployees } = await _supabase.from('employees').select('id');
+    const { data: allEmployees, error: allEmpError } = await _supabase.from('employees').select('id');
+    if (allEmpError) console.error('Error fetching all employees:', allEmpError);
     const totalEmpCount = allEmployees ? allEmployees.length : 0;
 
     // 3. Fetch today's data from both tables
-    const { data: ins } = await _supabase.from('check_ins').select('*, employees(name)').gte('timestamp', startOfDay).lte('timestamp', endOfDay);
-    const { data: outs } = await _supabase.from('check_outs').select('*, employees(name)').gte('timestamp', startOfDay).lte('timestamp', endOfDay);
+    const { data: ins, error: insError } = await _supabase.from('check_ins').select('*, employees(name)').gte('timestamp', startOfDay).lte('timestamp', endOfDay);
+    if (insError) console.error('Error fetching check-ins:', insError);
+    const { data: outs, error: outsError } = await _supabase.from('check_outs').select('*, employees(name)').gte('timestamp', startOfDay).lte('timestamp', endOfDay);
+    if (outsError) console.error('Error fetching check-outs:', outsError);
 
     // Combine and normalize for the live feed
     const combinedLogs = [
@@ -358,7 +450,8 @@ async function saveEmployeeData() {
         }
 
         // Insert fresh placeholder profile row instance configuration object context
-        const { error } = await _supabase.from('employees').insert([{ id, name, raw_id: null }]);
+        const { error } = await _supabase.from('employees').insert([{ id, name, raw_id: null, employee_id: id }]); // Assuming employee_id is the same as id for new entries
+        if (error) console.error('Error inserting new employee:', error);
         if(!error) showStatus(`Profile registered! ${name} can now scan their finger on their first login attempt.`, true);
     } else {
         // Perform inline data update operation transformations 
@@ -366,6 +459,7 @@ async function saveEmployeeData() {
             .from('employees')
             .update({ id: id, name: name })
             .eq('id', editCredId);
+        if (error) console.error('Error updating employee:', error);
 
         if(!error) {
             showStatus(`Successfully updated information for: ${name}`, true);
@@ -426,6 +520,7 @@ function cancelEditMode() {
 async function deleteEmployee(id, name) {
     if (confirm(`Confirming deletion sequence logic parameters for profile object: ${name}?`)) {
         const { error } = await _supabase.from('employees').delete().eq('id', id);
+        if (error) console.error('Error deleting employee:', error);
         if(!error) {
             updateAdminDashboard();
             showStatus("The targeted account file data parameter has been successfully scrubbed.", true);
@@ -442,10 +537,13 @@ function clearFormInputs() {
 // EXPORT AND RESET UTILITIES
 // ==========================================
 async function downloadSheet() {
-    const { data: ins } = await _supabase.from('check_ins').select('*, employees(name)');
-    const { data: outs } = await _supabase.from('check_outs').select('*, employees(name)');
+    const { data: ins, error: insError } = await _supabase.from('check_ins').select('*, employees(name)');
+    if (insError) console.error('Error fetching all check-ins for export:', insError);
 
-    if (!ins && !outs) {
+    const { data: outs, error: outsError } = await _supabase.from('check_outs').select('*, employees(name)');
+    if (outsError) console.error('Error fetching all check-outs for export:', outsError);
+
+    if ((!ins || ins.length === 0) && (!outs || outs.length === 0)) {
         alert("The system logs remain blank. No records available for export compilation.");
         return;
     }
@@ -472,12 +570,20 @@ async function downloadSheet() {
 async function clearAllData() {
     if (confirm("CRITICAL WARNING: This completely wipes out both the Employee Directory and all historic records. Proceed?")) {
         // Cascade delete configuration parameters will empty the log entries automatically
-        const { data: list } = await _supabase.from('employees').select('id');
+        const { data: list, error: empListError } = await _supabase.from('employees').select('id');
+        if (empListError) console.error('Error fetching employee IDs for deletion:', empListError);
+
         if (list && list.length > 0) {
             const ids = list.map(item => item.id);
-            await _supabase.from('employees').delete().in('id', ids);
+            const { error: empDeleteError } = await _supabase.from('employees').delete().in('id', ids);
+            if (empDeleteError) console.error('Error deleting employees:', empDeleteError);
         }
         
+        // Also clear check_ins and check_outs tables directly
+        const { error: checkInsDeleteError } = await _supabase.from('check_ins').delete().neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all rows
+        if (checkInsDeleteError) console.error('Error deleting check-ins:', checkInsDeleteError);
+        const { error: checkOutsDeleteError } = await _supabase.from('check_outs').delete().neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all rows
+        if (checkOutsDeleteError) console.error('Error deleting check-outs:', checkOutsDeleteError);
         sessionStorage.removeItem("admin_authenticated"); // Destroy local session token
         await updateAdminDashboard();
         executeViewSwitch('employee');
