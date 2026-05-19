@@ -4,7 +4,7 @@ const OFFICE_LON = 90.4141156;
 const ALLOWED_RADIUS_KM = 0.1;    // 100 meters restriction zone
 const ADMIN_PASSWORD = "amk2026"; 
 
-// Replace these strings with your exact settings from: Settings -> API
+// Centralized credentials linked directly to your Supabase project instance
 const SUPABASE_URL = "https://idhqqygtfbjcwerkywgn.supabase.co";
 const SUPABASE_KEY = "sb_publishable_KOfqg9CslH0Jvg8PphT6aA_jVklvK-U"; 
 
@@ -15,50 +15,79 @@ const _supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 // Runtime local cache references
 let attendanceLogLocal = [];
 
-// Initial layout execution
-updateAdminDashboard();
-
-function showStatus(message, isSuccess) {
-    const box = document.getElementById('statusBox');
-    box.style.display = 'block';
-    box.className = `status ${isSuccess ? 'success' : 'error'}`;
-    box.innerText = message;
-    window.scrollTo({top: 0, behavior: 'smooth'});
-}
+// DOM Initializer: Check persistent session token immediately when the page loads
+document.addEventListener("DOMContentLoaded", () => {
+    const isAdminLoggedIn = sessionStorage.getItem("admin_authenticated");
+    if (isAdminLoggedIn === "true") {
+        // Silently transition into admin view without re-prompting for password
+        executeViewSwitch('admin'); 
+    } else {
+        executeViewSwitch('employee');
+    }
+});
 
 // --- ROUTING MANAGER ---
 function switchView(target) {
-    const empInterface = document.getElementById('employeeInterface');
-    const adminInterface = document.getElementById('adminInterface');
-    const btnEmp = document.getElementById('btnEmpView');
-    const btnAdmin = document.getElementById('btnAdminView');
-
     if (target === 'admin') {
+        // If already validated in this tab session, skip password check
+        if (sessionStorage.getItem("admin_authenticated") === "true") {
+            executeViewSwitch('admin');
+            return;
+        }
+
         const passwordCheck = prompt("Enter Administration Security Password:");
         if (passwordCheck === ADMIN_PASSWORD) {
-            empInterface.style.display = 'none';
-            adminInterface.style.display = 'block';
-            btnEmp.classList.remove('active');
-            btnAdmin.classList.add('active');
-            updateAdminDashboard();
+            sessionStorage.setItem("admin_authenticated", "true"); // Save session state
+            executeViewSwitch('admin');
             showStatus("Admin verification successful.", true);
         } else {
             alert("Unauthorized Access. Invalid password.");
         }
     } else {
-        empInterface.style.display = 'block';
-        adminInterface.style.display = 'none';
-        btnEmp.classList.add('active');
-        btnAdmin.classList.remove('active');
+        // Clear session state if they explicitly choose to shift back to Employee Mode
+        sessionStorage.removeItem("admin_authenticated"); 
+        executeViewSwitch('employee');
     }
 }
 
+// Internal function to switch UI panels
+function executeViewSwitch(view) {
+    const empInterface = document.getElementById('employeeInterface');
+    const adminInterface = document.getElementById('adminInterface');
+    const btnEmp = document.getElementById('btnEmpView');
+    const btnAdmin = document.getElementById('btnAdminView');
+
+    if (view === 'admin') {
+        if(empInterface) empInterface.style.display = 'none';
+        if(adminInterface) adminInterface.style.display = 'block';
+        if(btnEmp) btnEmp.classList.remove('active');
+        if(btnAdmin) btnAdmin.classList.add('active');
+        updateAdminDashboard();
+    } else {
+        if(empInterface) empInterface.style.display = 'block';
+        if(adminInterface) adminInterface.style.display = 'none';
+        if(btnEmp) btnEmp.classList.add('active');
+        if(btnAdmin) btnAdmin.classList.remove('active');
+    }
+}
+
+// Haversine formula calculation for geo-fencing verification
 function getDistance(lat1, lon1, lat2, lon2) {
     const R = 6371; 
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
     return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))); 
+}
+
+function showStatus(message, isSuccess) {
+    const box = document.getElementById('statusBox');
+    if(box) {
+        box.style.display = 'block';
+        box.className = `status ${isSuccess ? 'success' : 'error'}`;
+        box.innerText = message;
+    }
+    window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
 // ==========================================
@@ -401,8 +430,9 @@ async function clearAllData() {
             await _supabase.from('employees').delete().in('id', ids);
         }
         
+        sessionStorage.removeItem("admin_authenticated"); // Destroy local session token
         updateAdminDashboard();
-        switchView('employee');
+        executeViewSwitch('employee');
         showStatus("All database entries successfully purged from Supabase.", false);
     }
 }
