@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMK Finger Attendence</title>
+    <!-- Link to external CSS stylesheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="navbar">
+    <h2>🏢 AMK Attendance Portal</h2>
+    <div class="nav-buttons">
+        <button id="btnEmpView" class="active" onclick="switchView('employee')">📱 Employee Mode</button>
+        <button id="btnAdminView" onclick="switchView('admin')">🔑 Admin Section</button>
+    </div>
+</div>
+
+<div class="container">
+    <div id="statusBox" class="status"></div>
+
+    <!-- ========================================== -->
+    <!-- INTERFACE 1: EMPLOYEE VIEW                 -->
+    <!-- ========================================== -->
+    <div id="employeeInterface">
+        <div class="card" style="text-align: center; max-width: 600px; margin: 0 auto;">
+            <h3 style="margin-top:0; color: var(--success);">📅 Daily Attendance Terminal</h3>
+            <p style="color: #5f6368;">Ensure you are physically present at the office to register your check-in or check-out.</p>
+            <br>
+            <button class="btn btn-success" style="padding: 20px; font-size: 18px;" onclick="processAttendance()">
+                👇 SCAN FINGERPRINT TO REGISTER
+            </button>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- INTERFACE 2: ADMIN VIEW & DASHBOARD        -->
+    <!-- ========================================== -->
+    <div id="adminInterface" style="display: none;">
+        
+        <!-- Live Admin Analytics Dashboard Summary -->
+        <div class="dashboard-grid">
+            <div class="stat-card">
+                <h4>Total Employees</h4>
+                <div class="value" id="statTotalEmployees">0</div>
+            </div>
+            <div class="stat-card success">
+                <h4>Present Today</h4>
+                <div class="value" id="statPresentToday">0</div>
+            </div>
+            <div class="stat-card danger">
+                <h4>Absent Today</h4>
+                <div class="value" id="statAbsentToday">0</div>
+            </div>
+        </div>
+
+        <div class="flex-container">
+            <!-- Left Side Stack: Add Employee & Actions -->
+            <div class="flex-child" style="flex: 0 0 350px;">
+                <div class="card">
+                    <h3 id="formTitle">👤 Add New Employee Account</h3>
+                    <input type="hidden" id="editCredId">
+                    
+                    <label for="empID">Employee ID / Code:</label>
+                    <input type="text" id="empID" placeholder="e.g. EMP101">
+
+                    <label for="empName">Employee Full Name:</label>
+                    <input type="text" id="empName" placeholder="e.g. Jane Doe">
+                    
+                    <div style="display: flex; gap: 10px;">
+                        <button id="btnSubmit" class="btn btn-primary" onclick="saveEmployeeData()"> Save Profile Data</button>
+                        <button id="btnCancelEdit" class="btn" style="background:#dc3545; color:white; display:none; width:35%;" onclick="cancelEditMode()">Cancel</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>📊 Data Control</h3>
+                    <button class="btn" style="background-color: #5f6368; color: white; margin-bottom: 10px;" onclick="downloadSheet()">📥 Download Full History (.CSV)</button>
+                    <button class="btn btn-danger" style="background-color: #c5221f;" onclick="clearAllData()">⚠️ Wipe All System Data</button>
+                </div>
+            </div>
+
+            <!-- Right Side Stack: Directory & Real-time Logs -->
+            <div class="flex-child">
+                <!-- Dashboard Live Log Monitor -->
+                <div class="card">
+                    <h3>📈 Today's Attendance Feed</h3>
+                    <div style="overflow-x:auto; max-height: 250px;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Time</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="liveLogTableBody">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Database Directory Container -->
+                <div class="card">
+                    <h3>👥 Active Employee Directory</h3>
+                    <div style="overflow-x:auto; max-height: 250px;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Biometric Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="employeeTableBody">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+</div>
+
+<!-- Link to external JavaScript runtime bundle logic -->
+<script src="app.js"></script>
+</body>
+</html>

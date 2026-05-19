@@ -1,0 +1,187 @@
+:root {
+    --primary: #1a73e8;
+    --success: #34a853;
+    --danger: #ea4335;
+    --warning: #fbbc05;
+    --dark: #202124;
+    --gray: #f1f3f4;
+    --border: #dadce0;
+}
+
+body { 
+    font-family: 'Segoe UI', Arial, sans-serif; 
+    margin: 0; 
+    padding: 0; 
+    background-color: #f8f9fa; 
+    color: var(--dark); 
+}
+
+/* Navigation / Header Bar */
+.navbar { 
+    background: white; 
+    padding: 15px 20px; 
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05); 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+}
+.navbar h2 { 
+    margin: 0; 
+    font-size: 20px; 
+    color: var(--primary); 
+}
+.nav-buttons button { 
+    padding: 8px 16px; 
+    border: 1px solid var(--border); 
+    border-radius: 4px; 
+    background: white; 
+    cursor: pointer; 
+    font-weight: 500; 
+}
+.nav-buttons button.active { 
+    background: var(--primary); 
+    color: white; 
+    border-color: var(--primary); 
+}
+
+.container { 
+    max-width: 900px; 
+    margin: 25px auto; 
+    padding: 0 20px; 
+}
+.card { 
+    background: white; 
+    padding: 30px; 
+    border-radius: 8px; 
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
+    margin-bottom: 20px; 
+}
+
+/* Dashboard Stats Grid */
+.dashboard-grid { 
+    display: grid; 
+    grid-template-columns: repeat(3, 1fr); 
+    gap: 15px; 
+    margin-bottom: 20px; 
+}
+.stat-card { 
+    background: white; 
+    padding: 20px; 
+    border-radius: 8px; 
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
+    text-align: center; 
+    border-top: 4px solid var(--primary); 
+}
+.stat-card.success { border-top-color: var(--success); }
+.stat-card.danger { border-top-color: var(--danger); }
+.stat-card h4 { 
+    margin: 0 0 10px 0; 
+    color: #5f6368; 
+    text-transform: uppercase; 
+    font-size: 12px; 
+    letter-spacing: 0.5px; 
+}
+.stat-card .value { 
+    font-size: 28px; 
+    font-weight: bold; 
+    color: var(--dark); 
+}
+
+/* Form Elements */
+label { 
+    display: block; 
+    margin-bottom: 6px; 
+    font-weight: 600; 
+    font-size: 14px; 
+}
+input, select { 
+    width: 100%; 
+    padding: 10px; 
+    margin-bottom: 15px; 
+    border: 1px solid var(--border); 
+    border-radius: 4px; 
+    box-sizing: border-box; 
+    font-size: 14px; 
+}
+
+/* Buttons */
+button.btn { 
+    width: 100%; 
+    padding: 12px; 
+    border: none; 
+    border-radius: 4px; 
+    font-size: 15px; 
+    font-weight: bold; 
+    cursor: pointer; 
+    transition: background 0.2s; 
+}
+.btn-primary { background: var(--primary); color: white; }
+.btn-success { background: var(--success); color: white; }
+.btn-danger { background: var(--danger); color: white; }
+
+/* Status Box */
+.status { 
+    padding: 12px; 
+    border-radius: 4px; 
+    font-weight: bold; 
+    margin-bottom: 20px; 
+    display: none; 
+    font-size: 14px; 
+}
+.status.success { 
+    background: #e6f4ea; 
+    color: #137333; 
+    border: 1px solid #c2e7cb; 
+}
+.status.error { 
+    background: #fce8e6; 
+    color: #c5221f; 
+    border: 1px solid #fad2cf; 
+}
+
+/* Tables */
+table { 
+    width: 100%; 
+    border-collapse: collapse; 
+    margin-top: 15px; 
+    font-size: 14px; 
+}
+th, td { 
+    padding: 10px; 
+    border: 1px solid var(--border); 
+    text-align: left; 
+}
+th { background: var(--gray); }
+.badge { 
+    padding: 4px 8px; 
+    border-radius: 12px; 
+    font-size: 11px; 
+    font-weight: bold; 
+    text-transform: uppercase; 
+}
+.badge.check-in { background: #e6f4ea; color: #137333; }
+.badge.check-out { background: #ffeeee; color: #c5221f; }
+
+.action-link { 
+    color: var(--primary); 
+    cursor: pointer; 
+    margin-right: 10px; 
+    font-weight: bold; 
+    text-decoration: underline; 
+}
+.action-link.delete { color: var(--danger); }
+
+.flex-container { 
+    display: flex; 
+    gap: 20px; 
+    align-items: flex-start; 
+}
+.flex-child { 
+    flex: 1; 
+    min-width: 0; 
+}
+
+@media(max-width: 768px) {
+    .flex-container { flex-direction: column; }
+    .dashboard-grid { grid-template-columns: 1fr; }
+}
