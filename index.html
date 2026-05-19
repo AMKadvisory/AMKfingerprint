@@ -13,6 +13,7 @@
 <div class="navbar">
     <h2>🏢 Office Attendance Portal</h2>
     <div class="nav-buttons">
+        <span id="dbStatus" class="db-status">Checking Connection...</span>
         <button id="btnEmpView" class="active" onclick="switchView('employee')">📱 Employee Mode</button>
         <button id="btnAdminView" onclick="switchView('admin')">🔑 Admin Section</button>
     </div>
@@ -36,7 +37,7 @@
         <hr style="margin-top: 20px; margin-bottom: 20px;">
         <button class="btn" style="padding: 15px; font-size: 16px; background-color: #6c757d; color: white;" onclick="processRegistration()">
             👆 REGISTER FINGERPRINT (First Time Only)
-            </button>
+        </button>
         </div>
     </div>
 
@@ -119,6 +120,12 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Error Console Area -->
+    <div id="errorConsoleContainer" style="margin-top: 30px;">
+        <h4 style="color: #5f6368; margin-bottom: 5px;">🛠️ System Error Console</h4>
+        <div id="errorConsole" class="card console-box"></div>
     </div>
 </div>
 
