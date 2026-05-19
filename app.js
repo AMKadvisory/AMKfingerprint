@@ -2,7 +2,7 @@
 const OFFICE_LAT = 23.7926166;       
 const OFFICE_LON = 90.4141156;       
 const ALLOWED_RADIUS_KM = 0.1;    // 100 meters restriction zone
-const ADMIN_PASSWORD = "amk2026"; 
+const ADMIN_PASSWORD = "admin123"; 
 
 // Centralized credentials linked directly to your Supabase project instance
 const SUPABASE_URL = "https://idhqqygtfbjcwerkywgn.supabase.co";
@@ -212,32 +212,56 @@ async function runBiometricVerification(employee) {
 
 async function recordLog(employee) {
     const now = new Date();
-    const todayStr = now.toLocaleDateString();
+    const todayStr = now.toISOString().split('T')[0];
+    const startOfDay = `${todayStr}T00:00:00Z`;
+    const endOfDay = `${todayStr}T23:59:59Z`;
     
-    // Check total actions committed today by this targeted asset to toggle action status
-    const { data: logs } = await _supabase
-        .from('attendance_log')
+    // 1. Check if employee has checked in today
+    const { data: checkInData } = await _supabase
+        .from('check_ins')
         .select('id')
         .eq('employee_id', employee.id)
-        .eq('date', todayStr);
+        .gte('timestamp', startOfDay)
+        .lte('timestamp', endOfDay)
+        .maybeSingle();
 
-    const countToday = logs ? logs.length : 0;
-    const mode = countToday % 2 === 0 ? "Check-In" : "Check-Out";
-
-    const payload = { 
-        employee_id: employee.id, 
-        name: employee.name, 
-        date: todayStr, 
-        time: now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'}), 
-        status: mode 
-    };
-
-    const { error } = await _supabase.from('attendance_log').insert([payload]);
-    if(!error) {
-        showStatus(`✅ Verified: ${employee.name} (${employee.id}) logged as [${mode}] at ${now.toLocaleTimeString()}`, true);
+    if (!checkInData) {
+        // No check-in found, perform Check-In
+        const { error } = await _supabase
+            .from('check_ins')
+            .insert([{ employee_id: employee.id, timestamp: now.toISOString() }]);
+        
+        if (!error) {
+            showStatus(`✅ Check-In Verified: ${employee.name} at ${now.toLocaleTimeString()}`, true);
+        } else {
+            showStatus("Error saving Check-In record.", false);
+        }
     } else {
-        showStatus("Error pushing transactional logging record up to cloud database server.", false);
+        // 2. Already checked in, check if already checked out today
+        const { data: checkOutData } = await _supabase
+            .from('check_outs')
+            .select('id')
+            .eq('employee_id', employee.id)
+            .gte('timestamp', startOfDay)
+            .lte('timestamp', endOfDay)
+            .maybeSingle();
+
+        if (!checkOutData) {
+            // Perform Check-Out
+            const { error } = await _supabase
+                .from('check_outs')
+                .insert([{ employee_id: employee.id, timestamp: now.toISOString() }]);
+            
+            if (!error) {
+                showStatus(`✅ Check-Out Verified: ${employee.name} at ${now.toLocaleTimeString()}`, true);
+            } else {
+                showStatus("Error saving Check-Out record.", false);
+            }
+        } else {
+            showStatus(`${employee.name} has already completed Check-In and Check-Out for today.`, false);
+        }
     }
+    await updateAdminDashboard();
 }
 
 // ==========================================
@@ -247,24 +271,39 @@ async function updateAdminDashboard() {
     // 1. Refresh Directories Table Display UI
     updateEmployeeTable();
     
-    const todayStr = new Date().toLocaleDateString();
+    const todayStr = new Date().toISOString().split('T')[0];
+    const startOfDay = `${todayStr}T00:00:00Z`;
+    const endOfDay = `${todayStr}T23:59:59Z`;
 
     // 2. Fetch all registered employees
     const { data: allEmployees } = await _supabase.from('employees').select('id');
     const totalEmpCount = allEmployees ? allEmployees.length : 0;
 
-    // 3. Fetch today's transaction items logs directly from cloud row entities
-    const { data: logsToday } = await _supabase
-        .from('attendance_log')
-        .select('*')
-        .eq('date', todayStr);
+    // 3. Fetch today's data from both tables
+    const { data: ins } = await _supabase.from('check_ins').select('*, employees(name)').gte('timestamp', startOfDay).lte('timestamp', endOfDay);
+    const { data: outs } = await _supabase.from('check_outs').select('*, employees(name)').gte('timestamp', startOfDay).lte('timestamp', endOfDay);
 
-    const actualLogs = logsToday || [];
-    const presentEmployees = new Set(actualLogs.map(log => log.employee_id));
-    const presentCount = presentEmployees.size;
+    // Combine and normalize for the live feed
+    const combinedLogs = [
+        ...(ins || []).map(i => ({ 
+            employee_id: i.employee_id, 
+            name: i.employees?.name || 'Unknown', 
+            time: new Date(i.timestamp).toLocaleTimeString(), 
+            status: 'Check-In', 
+            raw_time: i.timestamp 
+        })),
+        ...(outs || []).map(o => ({ 
+            employee_id: o.employee_id, 
+            name: o.employees?.name || 'Unknown', 
+            time: new Date(o.timestamp).toLocaleTimeString(), 
+            status: 'Check-Out', 
+            raw_time: o.timestamp 
+        }))
+    ].sort((a, b) => new Date(b.raw_time) - new Date(a.raw_time));
+
+    const presentCount = new Set((ins || []).map(i => i.employee_id)).size;
     const absentCount = Math.max(0, totalEmpCount - presentCount);
 
-    // Update Metrics Dashboard elements safely if active inside UI layer context
     if(document.getElementById('statTotalEmployees')) {
         document.getElementById('statTotalEmployees').innerText = totalEmpCount;
         document.getElementById('statPresentToday').innerText = presentCount;
@@ -274,11 +313,10 @@ async function updateAdminDashboard() {
     const liveLogBody = document.getElementById('liveLogTableBody');
     if(liveLogBody) {
         liveLogBody.innerHTML = '';
-        if (actualLogs.length === 0) {
+        if (combinedLogs.length === 0) {
             liveLogBody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#888;">No transactions registered today yet.</td></tr>`;
         } else {
-            // Sort to display newest transactions first
-            [...actualLogs].reverse().forEach(log => {
+            combinedLogs.forEach(log => {
                 const row = document.createElement('tr');
                 const badgeClass = log.status === 'Check-In' ? 'badge check-in' : 'badge check-out';
                 row.innerHTML = `
@@ -404,14 +442,24 @@ function clearFormInputs() {
 // EXPORT AND RESET UTILITIES
 // ==========================================
 async function downloadSheet() {
-    const { data: fullLogs } = await _supabase.from('attendance_log').select('*');
+    const { data: ins } = await _supabase.from('check_ins').select('*, employees(name)');
+    const { data: outs } = await _supabase.from('check_outs').select('*, employees(name)');
 
-    if (!fullLogs || fullLogs.length === 0) {
+    if (!ins && !outs) {
         alert("The system logs remain blank. No records available for export compilation.");
         return;
     }
+
+    const allData = [
+        ...(ins || []).map(i => ({ ...i, type: 'Check-In' })),
+        ...(outs || []).map(o => ({ ...o, type: 'Check-Out' }))
+    ].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
     let csv = "data:text/csv;charset=utf-8,Employee ID,Name,Date,Time,Status\n";
-    fullLogs.forEach(r => csv += `"${r.employee_id}","${r.name}","${r.date}","${r.time}","${r.status}"\n`);
+    allData.forEach(r => {
+        const dt = new Date(r.timestamp);
+        csv += `"${r.employee_id}","${r.employees?.name}","${dt.toLocaleDateString()}","${dt.toLocaleTimeString()}","${r.type}"\n`;
+    });
     
     const link = document.createElement("a");
     link.setAttribute("href", encodeURI(csv));
@@ -431,7 +479,7 @@ async function clearAllData() {
         }
         
         sessionStorage.removeItem("admin_authenticated"); // Destroy local session token
-        updateAdminDashboard();
+        await updateAdminDashboard();
         executeViewSwitch('employee');
         showStatus("All database entries successfully purged from Supabase.", false);
     }
