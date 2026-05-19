@@ -3,14 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AMK Finger Attendence</title>
-    <!-- Link to external CSS stylesheet -->
+    <title>Enterprise Attendance System</title>
     <link rel="stylesheet" href="style.css">
+    <!-- Include the Supabase JS Client Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
 <div class="navbar">
-    <h2>🏢 AMK Attendance Portal</h2>
+    <h2>🏢 Office Attendance Portal</h2>
     <div class="nav-buttons">
         <button id="btnEmpView" class="active" onclick="switchView('employee')">📱 Employee Mode</button>
         <button id="btnAdminView" onclick="switchView('admin')">🔑 Admin Section</button>
@@ -20,9 +21,7 @@
 <div class="container">
     <div id="statusBox" class="status"></div>
 
-    <!-- ========================================== -->
-    <!-- INTERFACE 1: EMPLOYEE VIEW                 -->
-    <!-- ========================================== -->
+    <!-- INTERFACE 1: EMPLOYEE VIEW -->
     <div id="employeeInterface">
         <div class="card" style="text-align: center; max-width: 600px; margin: 0 auto;">
             <h3 style="margin-top:0; color: var(--success);">📅 Daily Attendance Terminal</h3>
@@ -34,12 +33,8 @@
         </div>
     </div>
 
-    <!-- ========================================== -->
-    <!-- INTERFACE 2: ADMIN VIEW & DASHBOARD        -->
-    <!-- ========================================== -->
+    <!-- INTERFACE 2: ADMIN VIEW & DASHBOARD -->
     <div id="adminInterface" style="display: none;">
-        
-        <!-- Live Admin Analytics Dashboard Summary -->
         <div class="dashboard-grid">
             <div class="stat-card">
                 <h4>Total Employees</h4>
@@ -56,7 +51,6 @@
         </div>
 
         <div class="flex-container">
-            <!-- Left Side Stack: Add Employee & Actions -->
             <div class="flex-child" style="flex: 0 0 350px;">
                 <div class="card">
                     <h3 id="formTitle">👤 Add New Employee Account</h3>
@@ -81,9 +75,7 @@
                 </div>
             </div>
 
-            <!-- Right Side Stack: Directory & Real-time Logs -->
             <div class="flex-child">
-                <!-- Dashboard Live Log Monitor -->
                 <div class="card">
                     <h3>📈 Today's Attendance Feed</h3>
                     <div style="overflow-x:auto; max-height: 250px;">
@@ -96,14 +88,11 @@
                                     <th>Action</th>
                                 </tr>
                             </thead>
-                            <tbody id="liveLogTableBody">
-                                <!-- Populated dynamically -->
-                            </tbody>
+                            <tbody id="liveLogTableBody"></tbody>
                         </table>
                     </div>
                 </div>
 
-                <!-- Database Directory Container -->
                 <div class="card">
                     <h3>👥 Active Employee Directory</h3>
                     <div style="overflow-x:auto; max-height: 250px;">
@@ -116,19 +105,15 @@
                                     <th>Actions</th>
                                 </tr>
                             </thead>
-                            <tbody id="employeeTableBody">
-                                <!-- Populated dynamically -->
-                            </tbody>
+                            <tbody id="employeeTableBody"></tbody>
                         </table>
                     </div>
                 </div>
             </div>
         </div>
-        
     </div>
 </div>
 
-<!-- Link to external JavaScript runtime bundle logic -->
 <script src="app.js"></script>
 </body>
 </html>
