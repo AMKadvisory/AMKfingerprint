@@ -27,8 +27,15 @@
             <h3 style="margin-top:0; color: var(--success);">📅 Daily Attendance Terminal</h3>
             <p style="color: #5f6368;">Ensure you are physically present at the office to register your check-in or check-out.</p>
             <br>
-            <button class="btn btn-success" style="padding: 20px; font-size: 18px;" onclick="processAttendance()">
-                👇 SCAN FINGERPRINT TO REGISTER
+        <button class="btn btn-success" style="padding: 20px; font-size: 18px; margin-bottom: 10px;" onclick="processAttendance('check-in')">
+            ✅ CHECK-IN
+        </button>
+        <button class="btn btn-primary" style="padding: 20px; font-size: 18px;" onclick="processAttendance('check-out')">
+            🚪 CHECK-OUT
+        </button>
+        <hr style="margin-top: 20px; margin-bottom: 20px;">
+        <button class="btn" style="padding: 15px; font-size: 16px; background-color: #6c757d; color: white;" onclick="processRegistration()">
+            👆 REGISTER FINGERPRINT (First Time Only)
             </button>
         </div>
     </div>
